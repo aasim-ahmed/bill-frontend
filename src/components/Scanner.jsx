@@ -1,13 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useZxing } from 'react-zxing';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const API = 'https://bill-backend-w5f7.onrender.com';
 
-// Minimum ms between two accepted scans — prevents double-fire from the same barcode
-const SCAN_DEBOUNCE_MS = 1500;
-
-// Source badge labels
 const SOURCE_LABEL = {
   open_food_facts: 'Open Food Facts',
   upc_item_db: 'UPC Item DB',
@@ -15,16 +10,10 @@ const SOURCE_LABEL = {
   barcode_spider: 'Barcode Spider',
 };
 
-/**
- * Props:
- *   onAddProduct(product)  – called when a product is ready to add
- *   isScanning              – controlled by parent (Billing.jsx)
- *   setIsScanning           – setter from parent
- */
-export default function Scanner({ onAddProduct, isScanning, setIsScanning }) {
-  const [isProcessing, setIsProcessing] = useState(false);  // true while API call is in-flight
-  const [scannedBarcode, setScannedBarcode] = useState('');
-  const [scanError, setScanError] = useState('');     // toast for network errors
+export default function Scanner({ onAddProduct }) {
+  const [inputValue, setInputValue] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scanError, setScanError] = useState('');
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -32,69 +21,68 @@ export default function Scanner({ onAddProduct, isScanning, setIsScanning }) {
   const [productName, setProductName] = useState('');
   const [productPrice, setProductPrice] = useState('');
   const [productImage, setProductImage] = useState('');
-  const [productSource, setProductSource] = useState(null);  // which API found it
+  const [productSource, setProductSource] = useState(null);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
 
+  const inputRef = useRef(null);
   const priceInputRef = useRef(null);
-  const lastScanRef = useRef(0);   // timestamp of last accepted scan
 
-  // ── Scanner ─────────────────────────────────────────────────────────────────
-  const { ref } = useZxing({
-    paused: !isScanning,
-    onDecodeResult: useCallback((result) => {
-      const now = Date.now();
-      if (now - lastScanRef.current < SCAN_DEBOUNCE_MS) return;  // debounce
-      lastScanRef.current = now;
+  // Auto-focus barcode input
+  useEffect(() => {
+    if (!showModal && !isProcessing) {
+      inputRef.current?.focus();
+    }
+  }, [showModal, isProcessing]);
 
-      const barcode = result.getText().trim();
-      if (!barcode) return;
-
-      console.log('[Scanner] barcode:', JSON.stringify(barcode));
-      setScannedBarcode(barcode);
-      setIsScanning(false);
-      fetchProduct(barcode);
-    }, []),
-  });
-
-  // ── Fetch product ────────────────────────────────────────────────────────────
-  const fetchProduct = async (barcode) => {
-    setIsProcessing(true);
-    try {
-      const { data } = await axios.get(`${API}/api/products/${barcode}`);
-      console.log('[fetchProduct] DB hit:', data.data);
-      onAddProduct?.(data.data);
-    } catch (err) {
-      // Differentiate between 404 (expected, open modal) and 500/Network Error
-      if (!err.response || err.response.status !== 404) {
-        console.error('[fetchProduct] Network/Server Error:', err.message);
-        setScanError('Error: unable to reach server — please check connection.');
-        setTimeout(() => setScanError(''), 3500);
-        return;
-      }
-
-      const errData = err.response?.data || {};
-      console.log('[fetchProduct] 404 payload:', errData);
-      setUnknownBarcode(barcode);
-      setProductName(errData.productName || '');
-      setProductImage(errData.imageUrl || '');
-      setProductSource(errData.source || null);
-      setProductPrice('');
-      // If price is missing (from DB cache), prompt user immediately
-      setModalError(errData.priceMissing ? 'Price is missing for this item. Please enter it now.' : '');
-      setShowModal(true);
-    } finally {
-      setIsProcessing(false);
+  const handleBlur = () => {
+    if (!showModal) {
+      setTimeout(() => {
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'SELECT') {
+          inputRef.current?.focus();
+        }
+      }, 10);
     }
   };
 
-  // ── Auto-focus price when modal opens ────────────────────────────────────────
+  const handleKeyDown = async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const barcode = inputValue.replace(/\D/g, '');
+      if (!barcode) return;
+
+      setIsProcessing(true);
+      try {
+        const { data } = await axios.get(`${API}/api/products/${barcode}`);
+        onAddProduct?.(data.data);
+        setInputValue('');
+      } catch (err) {
+        if (!err.response || err.response.status !== 404) {
+          setScanError('Error: unable to reach server — please check connection.');
+          setTimeout(() => setScanError(''), 3500);
+        } else {
+          const errData = err.response?.data || {};
+          setUnknownBarcode(barcode);
+          setProductName(errData.productName || '');
+          setProductImage(errData.imageUrl || '');
+          setProductSource(errData.source || null);
+          setProductPrice('');
+          setModalError(errData.priceMissing ? 'Price is missing for this item. Please enter it now.' : '');
+          setShowModal(true);
+        }
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  // Auto-focus price when modal opens
   useEffect(() => {
     if (showModal) setTimeout(() => priceInputRef.current?.focus(), 100);
   }, [showModal]);
 
-  // ── Keyboard shortcuts inside modal ─────────────────────────────────────────
-  const handleKeyDown = (e) => {
+  const handleModalKeyDown = (e) => {
     if (e.key === 'Enter') handleSaveProduct();
     if (e.key === 'Escape') closeModal();
   };
@@ -104,7 +92,6 @@ export default function Scanner({ onAddProduct, isScanning, setIsScanning }) {
     setModalError('');
   };
 
-  // ── Save product ─────────────────────────────────────────────────────────────
   const handleSaveProduct = async () => {
     if (!productName.trim()) return setModalError('Product name is required.');
     const priceNum = parseFloat(productPrice);
@@ -119,13 +106,14 @@ export default function Scanner({ onAddProduct, isScanning, setIsScanning }) {
         barcode: unknownBarcode,
       });
       onAddProduct?.(data.data);
+      setInputValue(''); // Clear on successful add
       closeModal();
     } catch (err) {
-      // 409 = barcode was already cached by the backend → fetch and add
       if (err.response?.status === 409) {
         try {
           const { data } = await axios.get(`${API}/api/products/${unknownBarcode}`);
           onAddProduct?.(data.data);
+          setInputValue('');
           closeModal();
           return;
         } catch (_) { }
@@ -136,76 +124,54 @@ export default function Scanner({ onAddProduct, isScanning, setIsScanning }) {
     }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col items-center w-full h-full relative">
-
+    <div className="flex flex-col items-center w-full relative">
       {/* Network Error Toast */}
       {scanError && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-max max-w-full px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-full shadow-lg z-50 animate-fade-in-down">
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-max max-w-full px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-full shadow-lg z-50 animate-fade-in-down">
           {scanError}
         </div>
       )}
 
       {/* Main Scanner Area */}
-      <div className="w-full flex-1 flex flex-col items-center justify-center min-h-[250px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden relative group transition-colors hover:border-slate-300">
+      <div className="w-full flex flex-col items-center justify-center p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl relative transition-colors hover:border-slate-300">
+        
+        <label className="text-slate-500 font-bold mb-3 text-sm uppercase tracking-wider flex items-center gap-2">
+          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+          </svg>
+          USB Barcode Scanner
+        </label>
+        
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          disabled={isProcessing}
+          placeholder="Scan barcode..."
+          autoFocus
+          className="w-full bg-white border-2 border-slate-300 focus:border-blue-500 rounded-xl px-4 py-3 text-center text-xl font-mono shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all placeholder:text-slate-300 text-slate-800 disabled:opacity-50"
+        />
 
-        {/* Camera view */}
-        {isScanning ? (
-          <>
-            <video ref={ref} className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-
-            {/* Scanning Indicator Overlay */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 bg-black/50 backdrop-blur-sm text-white text-sm font-medium rounded-full">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
-              </span>
-              Scanning Barcode…
-            </div>
-          </>
-        ) : isProcessing ? (
-          <div className="flex flex-col items-center gap-3 text-blue-600">
-            <svg className="animate-spin h-8 w-8" viewBox="0 0 24 24" fill="none">
+        {isProcessing && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2 text-blue-600 z-10">
+            <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-            <span className="text-sm font-bold tracking-wide">Processing…</span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center text-slate-400">
-            <svg className="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-            <span className="text-sm font-medium">Camera inactive</span>
+            <span className="text-xs font-bold tracking-wide">Processing…</span>
           </div>
         )}
       </div>
-
-      {/* Action Button */}
-      <button
-        onClick={() => setIsScanning((s) => !s)}
-        disabled={isProcessing}
-        className={`w-full mt-4 py-3 px-4 font-bold text-base rounded-xl transition shadow-sm ${isScanning
-          ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50'
-          }`}
-      >
-        {isScanning ? 'Stop Camera' : 'Start Camera'}
-      </button>
-
-      {/* Last Scanned Status */}
-      {scannedBarcode && !isProcessing && !isScanning && (
-        <div className="w-full mt-3 p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl text-center">
-          <span className="text-emerald-600 text-xs font-bold uppercase tracking-wider block mb-0.5">Scanned Successfully</span>
-          <strong className="text-slate-800 text-sm font-mono tracking-wide">{scannedBarcode}</strong>
-        </div>
-      )}
 
       {/* ── Add Product Modal ─────────────────────────────────────────────── */}
       {showModal && (
         <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onKeyDown={handleKeyDown}
+          onKeyDown={handleModalKeyDown}
         >
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col">
 

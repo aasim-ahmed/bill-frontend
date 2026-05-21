@@ -24,9 +24,6 @@ export default function Billing({ onNavigate }) {
     clearCart();
   };
 
-  // ── Scanner state (lifted so Billing can auto-enable it) ─────────────────────
-  const [isScanning, setIsScanning] = useState(false);
-
   // ── Cart / bill state ────────────────────────────────────────────────────────
   const [cart, setCart] = useState([]);
   const [discount, setDiscount] = useState('');
@@ -46,8 +43,6 @@ export default function Billing({ onNavigate }) {
   };
 
   // ── Cart helpers ─────────────────────────────────────────────────────────────
-  // After a product with a valid price is added we automatically re-enable the
-  // scanner so the cashier can go straight to the next scan without any tap.
   const handleAddProduct = useCallback((product) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.barcode === product.barcode);
@@ -60,16 +55,6 @@ export default function Billing({ onNavigate }) {
       showToast(`Added: ${product.name}`);
       return [...prev, { ...product, qty: 1 }];
     });
-
-    // Auto-turn on camera only when the product has a usable price.
-    // If price is missing the modal will still be open; let the cashier close it
-    // first — we'll fire setIsScanning(true) once they save from the modal too
-    // (handled below via the onAddProduct callback chain in Scanner.jsx).
-    const price = parseFloat(product.price);
-    if (!isNaN(price) && price >= 0) {
-      // Small delay so any modal close animation finishes first.
-      setTimeout(() => setIsScanning(true), 300);
-    }
   }, []);
 
   const changeQty = (barcode, delta) => {
@@ -87,7 +72,6 @@ export default function Billing({ onNavigate }) {
     setCart([]);
     setDiscount('');
     setCustomer('');
-    setIsScanning(false);
     setEditingItem(null);
   };
 
@@ -234,12 +218,8 @@ export default function Billing({ onNavigate }) {
                 Scan Product
               </h2>
 
-              {/* isScanning & setIsScanning lifted here so Billing can
-                  auto-activate the camera after a successful cart add. */}
               <Scanner
                 onAddProduct={handleAddProduct}
-                isScanning={isScanning}
-                setIsScanning={setIsScanning}
               />
             </div>
           </div>
