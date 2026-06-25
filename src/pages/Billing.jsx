@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Scanner from '../components/Scanner';
 import CashierLoginModal from '../components/CashierLoginModal';
+import Receipt from '../components/printing/Receipt';
+import InstallAppButton from '../components/InstallAppButton';
 
 const API = 'https://bill-backend-w5f7.onrender.com';
 const CASHIER_KEY = 'billingpos_cashier_name';
@@ -31,6 +33,11 @@ export default function Billing({ onNavigate }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [toast, setToast] = useState(null);  // { msg, type }
+
+  // ── Receipt / print state ─────────────────────────────────────────────────
+  const [lastSavedBill, setLastSavedBill] = useState(null); // { id, created_at, cart snapshot, totals }
+  const [receiptData, setReceiptData] = useState(null);
+  const [printing, setPrinting] = useState(false);
 
   // ── Edit state ───────────────────────────────────────────────────────────────
   const [editingItem, setEditingItem] = useState(null); // barcode
@@ -84,7 +91,7 @@ export default function Billing({ onNavigate }) {
     const name = editForm.name.trim() || 'Unknown Product';
 
     // Update cart instantly (recalculates all totals automatically on render)
-    setCart(prev => prev.map(item => 
+    setCart(prev => prev.map(item =>
       item.barcode === barcode ? { ...item, name, price: priceNum } : item
     ));
     setEditingItem(null);
@@ -117,7 +124,7 @@ export default function Billing({ onNavigate }) {
     setSaving(true);
     setSaveError(false);
     try {
-      await axios.post(`${API}/api/bills`, {
+      const { data } = await axios.post(`${API}/api/bills`, {
         items: cart.map(({ barcode, qty }) => ({ barcode, qty })),
         subtotal,
         discount: discountAmt,
@@ -125,7 +132,20 @@ export default function Billing({ onNavigate }) {
         cashier_name: cashierName.trim(),
         customer_name: customer.trim(),
       });
-      showToast('Bill saved ✓');
+      const savedBill = data.data;
+      // Snapshot everything needed for the receipt before clearing
+      setLastSavedBill({
+        id: savedBill.id,
+        created_at: savedBill.created_at,
+        cart: [...cart],
+        subtotal,
+        discountAmt,
+        discountPct,
+        total,
+        cashierName: cashierName.trim(),
+        customerName: customer.trim(),
+      });
+      showToast('Bill saved ✓  —  Ready to print');
       clearCart();
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
@@ -134,6 +154,27 @@ export default function Billing({ onNavigate }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Print bill ─────────────────────────────────────────────────────────────────
+  const handlePrintBill = async () => {
+    if (!lastSavedBill) return;
+    setPrinting(true);
+    const rd = buildReceiptData({
+      cart: lastSavedBill.cart,
+      subtotal: lastSavedBill.subtotal,
+      discountAmt: lastSavedBill.discountAmt,
+      discountPct: lastSavedBill.discountPct,
+      total: lastSavedBill.total,
+      cashierName: lastSavedBill.cashierName,
+      customerName: lastSavedBill.customerName,
+      billId: lastSavedBill.id,
+      createdAt: lastSavedBill.created_at,
+    });
+    setReceiptData(rd);
+    // Wait for React to render the receipt, then print
+    await triggerPrint();
+    setPrinting(false);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -175,33 +216,37 @@ export default function Billing({ onNavigate }) {
           </button>
         </nav>
 
-        {/* Cashier badge — only shown once logged in */}
-        {cashierName && (
-          <div className="flex items-center gap-3 ml-auto">
-            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-3.5 py-1.5">
-              {/* Avatar circle */}
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase shrink-0">
-                {cashierName.charAt(0)}
-              </span>
-              <span className="text-sm font-semibold text-blue-800 hidden sm:inline">
-                Cashier:&nbsp;<span className="font-bold">{cashierName}</span>
-              </span>
-            </div>
+        <div className="flex items-center gap-3 ml-auto">
+          <InstallAppButton />
 
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              title="Log out"
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-red-500 transition px-2 py-1.5 rounded-lg hover:bg-red-50"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
-              </svg>
-              <span className="hidden sm:inline">Log out</span>
-            </button>
-          </div>
-        )}
+          {/* Cashier badge — only shown once logged in */}
+          {cashierName && (
+            <>
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-3.5 py-1.5">
+                {/* Avatar circle */}
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase shrink-0">
+                  {cashierName.charAt(0)}
+                </span>
+                <span className="text-sm font-semibold text-blue-800 hidden sm:inline">
+                  Cashier:&nbsp;<span className="font-bold">{cashierName}</span>
+                </span>
+              </div>
+
+              {/* Logout */}
+              <button
+                onClick={handleLogout}
+                title="Log out"
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-red-500 transition px-2 py-1.5 rounded-lg hover:bg-red-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+                </svg>
+                <span className="hidden sm:inline">Log out</span>
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto md:overflow-hidden p-4 lg:p-6">
@@ -461,33 +506,80 @@ export default function Billing({ onNavigate }) {
                 </div>
               )}
 
-              {/* Save Button */}
-              <button
-                onClick={handleSaveBill}
-                disabled={!canSave || saving}
-                className={`w-full py-3.5 text-base font-bold text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-2
-                  ${!canSave
-                    ? 'bg-slate-300 shadow-none cursor-not-allowed text-slate-500'
-                    : saveError
-                      ? 'bg-red-500 hover:bg-red-600 hover:shadow-lg'
-                      : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5'
-                  }`}
-              >
-                {saving ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white/80" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    Processing Bill...
-                  </>
-                ) : saveError ? 'Failed — Try Saving Again' : 'Complete Checkout'}
-              </button>
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                {/* Save Button */}
+                <button
+                  onClick={handleSaveBill}
+                  disabled={!canSave || saving}
+                  className={`flex-1 py-3.5 text-base font-bold text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-2
+                    ${!canSave
+                      ? 'bg-slate-300 shadow-none cursor-not-allowed text-slate-500'
+                      : saveError
+                        ? 'bg-red-500 hover:bg-red-600 hover:shadow-lg'
+                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5'
+                    }`}
+                >
+                  {saving ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white/80" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Processing Bill...
+                    </>
+                  ) : saveError ? 'Failed — Try Saving Again' : 'Complete Checkout'}
+                </button>
+
+                {/* Print Bill Button — only visible after a bill is saved */}
+                {lastSavedBill && (
+                  <button
+                    onClick={handlePrintBill}
+                    disabled={printing}
+                    className="flex items-center justify-center gap-2 px-5 py-3.5 text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    title="Print last saved bill"
+                  >
+                    {printing ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-white/80" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        Printing…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                        Print Bill
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>
         </div>
       </main>
+
+      {/* ── Receipt render area (hidden on screen, visible only to @media print) ── */}
+      {receiptData && (
+        <div
+          style={{
+            position: 'fixed',
+            left: '-9999px',
+            top: 0,
+            width: '80mm',
+            zIndex: -1,
+            pointerEvents: 'none',
+          }}
+        >
+          <Receipt data={receiptData} />
+        </div>
+      )}
     </div>
   );
 }
