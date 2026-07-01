@@ -1,5 +1,7 @@
 import React from 'react';
 
+const formatCurrency = (value) => `₹${Number(value || 0).toFixed(2)}`;
+
 /**
  * Receipt component optimised for 80mm (≈302px at 203 DPI) thermal paper.
  *

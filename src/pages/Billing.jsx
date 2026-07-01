@@ -8,6 +8,60 @@ import InstallAppButton from '../components/InstallAppButton';
 const API = 'https://bill-backend-w5f7.onrender.com';
 const CASHIER_KEY = 'billingpos_cashier_name';
 
+const buildReceiptData = ({
+  cart,
+  subtotal,
+  discountAmt,
+  discountPct,
+  total,
+  cashierName,
+  customerName,
+  billId,
+  createdAt,
+}) => ({
+  billNumber: billId ? `#${billId}` : '—',
+  date: createdAt
+    ? new Date(createdAt).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : new Date().toLocaleString('en-IN'),
+  cashier: cashierName || '—',
+  customer: customerName || '—',
+  items: cart.map((item) => ({
+    name: item.name,
+    qty: item.qty,
+    price: Number(item.price),
+    total: Number((Number(item.price) * Number(item.qty)).toFixed(2)),
+  })),
+  subtotal: Number(subtotal),
+  discountAmt: Number(discountAmt),
+  discountPct: Number(discountPct),
+  tax: 0,
+  total: Number(total),
+});
+
+const triggerPrint = () =>
+  new Promise((resolve) => {
+    const finish = () => {
+      window.removeEventListener('afterprint', finish);
+      resolve();
+    };
+
+    window.addEventListener('afterprint', finish, { once: true });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+        setTimeout(finish, 500);
+      });
+    });
+  });
+
 export default function Billing({ onNavigate }) {
   // ── Cashier session ──────────────────────────────────────────────────────────
   // Initialise from localStorage so the name survives a page refresh.
@@ -160,21 +214,24 @@ export default function Billing({ onNavigate }) {
   const handlePrintBill = async () => {
     if (!lastSavedBill) return;
     setPrinting(true);
-    const rd = buildReceiptData({
-      cart: lastSavedBill.cart,
-      subtotal: lastSavedBill.subtotal,
-      discountAmt: lastSavedBill.discountAmt,
-      discountPct: lastSavedBill.discountPct,
-      total: lastSavedBill.total,
-      cashierName: lastSavedBill.cashierName,
-      customerName: lastSavedBill.customerName,
-      billId: lastSavedBill.id,
-      createdAt: lastSavedBill.created_at,
-    });
-    setReceiptData(rd);
-    // Wait for React to render the receipt, then print
-    await triggerPrint();
-    setPrinting(false);
+    try {
+      setReceiptData(buildReceiptData({
+        cart: lastSavedBill.cart,
+        subtotal: lastSavedBill.subtotal,
+        discountAmt: lastSavedBill.discountAmt,
+        discountPct: lastSavedBill.discountPct,
+        total: lastSavedBill.total,
+        cashierName: lastSavedBill.cashierName,
+        customerName: lastSavedBill.customerName,
+        billId: lastSavedBill.id,
+        createdAt: lastSavedBill.created_at,
+      }));
+      // Wait for React to render the receipt, then print.
+      await triggerPrint();
+    } finally {
+      setReceiptData(null);
+      setPrinting(false);
+    }
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
