@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import axios from 'axios';
 import Scanner from '../components/Scanner';
 import CashierLoginModal from '../components/CashierLoginModal';
 import Receipt from '../components/printing/Receipt';
 import InstallAppButton from '../components/InstallAppButton';
+import { printerService } from '../services/printing/printerService';
 
 const API = 'https://bill-backend-w5f7.onrender.com';
 const CASHIER_KEY = 'billingpos_cashier_name';
@@ -45,22 +46,7 @@ const buildReceiptData = ({
   total: Number(total),
 });
 
-const triggerPrint = () =>
-  new Promise((resolve) => {
-    const finish = () => {
-      window.removeEventListener('afterprint', finish);
-      resolve();
-    };
 
-    window.addEventListener('afterprint', finish, { once: true });
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.print();
-        setTimeout(finish, 500);
-      });
-    });
-  });
 
 export default function Billing({ onNavigate }) {
   // ── Cashier session ──────────────────────────────────────────────────────────
@@ -215,7 +201,7 @@ export default function Billing({ onNavigate }) {
     if (!lastSavedBill) return;
     setPrinting(true);
     try {
-      setReceiptData(buildReceiptData({
+      const data = buildReceiptData({
         cart: lastSavedBill.cart,
         subtotal: lastSavedBill.subtotal,
         discountAmt: lastSavedBill.discountAmt,
@@ -225,9 +211,19 @@ export default function Billing({ onNavigate }) {
         customerName: lastSavedBill.customerName,
         billId: lastSavedBill.id,
         createdAt: lastSavedBill.created_at,
-      }));
-      // Wait for React to render the receipt, then print.
-      await triggerPrint();
+      });
+
+      // On native Android: ESC/POS USB print.
+      // On desktop browser: render Receipt component then window.print().
+      if (!window.Capacitor?.isNativePlatform?.()) {
+        setReceiptData(data);
+        // Wait one frame for React to mount the Receipt DOM before printing.
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
+
+      await printerService.printReceipt(data);
+    } catch (err) {
+      showToast(err.message || 'Print failed', 'error');
     } finally {
       setReceiptData(null);
       setPrinting(false);
