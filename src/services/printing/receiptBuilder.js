@@ -25,6 +25,7 @@ const STORE_NAME    = 'NazMart';
 const STORE_ADDRESS = 'Your Neighbourhood Store';
 const THANK_YOU     = 'Thank you for shopping!';
 const VISIT_AGAIN   = 'Please visit again.';
+const POWERED_BY    = 'Powered by Zapprex Technologies';
 
 /** Format a rupee amount: ₹ symbol encoded as ? for Latin-1 printers, then amount. */
 const formatRupee = (amount) => `Rs.${Number(amount).toFixed(2)}`;
@@ -130,6 +131,8 @@ export function buildReceiptBytes(receiptData) {
   b.center()
    .textLine(THANK_YOU)
    .textLine(VISIT_AGAIN)
+   .newline()
+   .textLine(POWERED_BY)
    .newline();
 
   b.divider();

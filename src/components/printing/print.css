@@ -204,6 +204,13 @@
   color: #555;
 }
 
+.receipt-powered-by {
+  font-size: 9px;
+  color: #777;
+  margin-top: 3mm;
+  letter-spacing: 0.3px;
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * PRINT MEDIA RULES

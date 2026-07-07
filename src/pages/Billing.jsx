@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 import Scanner from '../components/Scanner';
 import CashierLoginModal from '../components/CashierLoginModal';
 import Receipt from '../components/printing/Receipt';
 import InstallAppButton from '../components/InstallAppButton';
-import { printerService } from '../services/printing/printerService';
+import { printerManager } from '../services/printing/printerManager';
 
 const API = 'https://bill-backend-w5f7.onrender.com';
 const CASHIER_KEY = 'billingpos_cashier_name';
@@ -198,7 +199,8 @@ export default function Billing({ onNavigate }) {
 
   // ── Print bill ─────────────────────────────────────────────────────────────────
   const handlePrintBill = async () => {
-    if (!lastSavedBill) return;
+    // Double-tap / in-flight guard (printing state also disables the button)
+    if (!lastSavedBill || printing) return;
     setPrinting(true);
     try {
       const data = buildReceiptData({
@@ -213,15 +215,14 @@ export default function Billing({ onNavigate }) {
         createdAt: lastSavedBill.created_at,
       });
 
-      // On native Android: ESC/POS USB print.
-      // On desktop browser: render Receipt component then window.print().
-      if (!window.Capacitor?.isNativePlatform?.()) {
+      // Browser printing requires the Receipt DOM to be mounted BEFORE
+      // window.print() fires so @media print can capture it.
+      if (!Capacitor.isNativePlatform()) {
         setReceiptData(data);
-        // Wait one frame for React to mount the Receipt DOM before printing.
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       }
 
-      await printerService.printReceipt(data);
+      await printerManager.printReceipt(data);
     } catch (err) {
       showToast(err.message || 'Print failed', 'error');
     } finally {
@@ -266,6 +267,17 @@ export default function Billing({ onNavigate }) {
             className="px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
           >
             Recent Bills
+          </button>
+          <button
+            onClick={() => onNavigate?.('printer-settings')}
+            className="px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition flex items-center gap-1.5"
+            title="Printer Settings"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <span className="hidden sm:inline">Printer</span>
           </button>
         </nav>
 

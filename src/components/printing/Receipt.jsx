@@ -130,10 +130,11 @@ export default function Receipt({
 
       <div className="receipt-divider receipt-divider-double" />
 
-      {/* ── Footer ──────────────────────────────────────────────── */}
+      {/* ── Footer ────────────────────────────────────────────────── */}
       <div className="receipt-footer">
         <div className="receipt-thank-you">{thankYouMsg}</div>
         <div className="receipt-visit">Visit again!</div>
+        <div className="receipt-powered-by">Powered by Zapprex Technologies</div>
       </div>
     </div>
   );
