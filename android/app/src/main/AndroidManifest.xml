@@ -35,9 +35,10 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
-    <uses-feature android:name="android.hardware.usb.host" required="true" />
-    <uses-feature android:name="android.hardware.bluetooth" required="false" />
+    <!-- Hardware features — optional so the app installs on all devices -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
 

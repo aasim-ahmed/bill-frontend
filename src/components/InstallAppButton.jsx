@@ -1,56 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 export default function InstallAppButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstallable, setIsInstallable] = useState(false);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      // Stash the event so it can be triggered later.
-      setDeferredPrompt(e);
-      // Update UI notify the user they can install the PWA
-      setIsInstallable(true);
-    };
-
-    const handleAppInstalled = () => {
-      // Hide the app-provided install promotion
-      setIsInstallable(false);
-      // Clear the deferredPrompt so it can be garbage collected
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      return;
-    }
-    // Show the install prompt
-    deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      console.log('User accepted the install prompt');
-    } else {
-      console.log('User dismissed the install prompt');
-    }
-    // We've used the prompt, and can't use it again, throw it away
-    setDeferredPrompt(null);
-    setIsInstallable(false);
+  const handleInstallClick = () => {
+    const link = document.createElement('a');
+    link.href = '/downloads/NazMart-latest.apk';
+    link.download = 'NazMart-latest.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-
-  if (!isInstallable) {
-    return null;
-  }
 
   return (
     <button
