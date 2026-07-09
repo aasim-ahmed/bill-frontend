@@ -9,7 +9,6 @@
  *   billNumber  : string,
  *   date        : string,
  *   cashier     : string,
- *   customer    : string,
  *   items       : Array<{ name: string, qty: number, price: number, total: number }>,
  *   subtotal    : number,
  *   discountAmt : number,
@@ -21,11 +20,11 @@
 
 import { EscPosBuilder } from './escpos/builder.js';
 
-const STORE_NAME    = 'NazMart';
+const STORE_NAME = 'NazMart';
 const STORE_ADDRESS = 'Your Neighbourhood Store';
-const THANK_YOU     = 'Thank you for shopping!';
-const VISIT_AGAIN   = 'Please visit again.';
-const POWERED_BY    = 'Powered by Zapprex Technologies';
+const THANK_YOU = 'Thank you for shopping!';
+const VISIT_AGAIN = 'Please visit again.';
+const POWERED_BY = 'Powered by Zapprex Technologies';
 
 /** Format a rupee amount: ₹ symbol encoded as ? for Latin-1 printers, then amount. */
 const formatRupee = (amount) => `Rs.${Number(amount).toFixed(2)}`;
@@ -44,22 +43,21 @@ export function buildReceiptBytes(receiptData) {
 
   // ── Header ───────────────────────────────────────────────────────────────
   b.center()
-   .doubleSize()
-   .boldOn()
-   .textLine(STORE_NAME)
-   .boldOff()
-   .normalSize()
-   .textLine(STORE_ADDRESS)
-   .newline();
+    .doubleSize()
+    .boldOn()
+    .textLine(STORE_NAME)
+    .boldOff()
+    .normalSize()
+    .textLine(STORE_ADDRESS)
+    .newline();
 
   b.divider();
 
   // ── Bill info ─────────────────────────────────────────────────────────────
   b.left();
   b.row('Bill No:', receiptData.billNumber);
-  b.row('Date:',    receiptData.date);
+  b.row('Date:', receiptData.date);
   b.row('Cashier:', receiptData.cashier);
-  b.row('Customer:', receiptData.customer);
 
   b.divider();
 
@@ -68,9 +66,9 @@ export function buildReceiptBytes(receiptData) {
   b.boldOn();
   b.left().textLine(
     padRight('Item', 22) +
-    padLeft('Qty',   4) +
+    padLeft('Qty', 4) +
     padLeft('Price', 8) +
-    padLeft('Amt',   8)
+    padLeft('Amt', 8)
   );
   b.boldOff();
   b.divider();
@@ -78,7 +76,7 @@ export function buildReceiptBytes(receiptData) {
   // ── Line items ───────────────────────────────────────────────────────────
   for (const item of receiptData.items) {
     const nameLine = truncate(item.name, 22);
-    const qtyStr   = String(item.qty);
+    const qtyStr = String(item.qty);
     const priceStr = formatRupee(item.price);
     const totalStr = formatRupee(item.total);
 
@@ -86,25 +84,31 @@ export function buildReceiptBytes(receiptData) {
     if (nameLine.length <= 22) {
       b.left().textLine(
         padRight(nameLine, 22) +
-        padLeft(qtyStr,    4) +
-        padLeft(priceStr,  8) +
-        padLeft(totalStr,  8)
+        padLeft(qtyStr, 4) +
+        padLeft(priceStr, 8) +
+        padLeft(totalStr, 8)
       );
     } else {
       // Long name: name on first line, figures on second
       b.left().textLine(nameLine);
       b.left().textLine(
         padRight('', 22) +
-        padLeft(qtyStr,   4) +
+        padLeft(qtyStr, 4) +
         padLeft(priceStr, 8) +
         padLeft(totalStr, 8)
       );
     }
   }
-
+  
   b.divider();
 
   // ── Totals ───────────────────────────────────────────────────────────────
+  const totalProducts = receiptData.items.reduce(
+    (sum, item) => sum + Number(item.qty || 0),
+    0
+  );
+
+  b.row('Total Products:', String(totalProducts));
   b.row('Subtotal:', formatRupee(receiptData.subtotal));
 
   if (receiptData.discountAmt > 0) {
@@ -129,11 +133,11 @@ export function buildReceiptBytes(receiptData) {
 
   // ── Footer ───────────────────────────────────────────────────────────────
   b.center()
-   .textLine(THANK_YOU)
-   .textLine(VISIT_AGAIN)
-   .newline()
-   .textLine(POWERED_BY)
-   .newline();
+    .textLine(THANK_YOU)
+    .textLine(VISIT_AGAIN)
+    .newline()
+    .textLine(POWERED_BY)
+    .newline();
 
   b.divider();
 

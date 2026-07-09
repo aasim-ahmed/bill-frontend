@@ -30,7 +30,6 @@ function makeTestReceiptData() {
       hour: '2-digit', minute: '2-digit', hour12: true,
     }),
     cashier: 'NazMart',
-    customer: 'Printer Test',
     items: [{ name: 'Test Item', qty: 1, price: 10, total: 10 }],
     subtotal: 10,
     discountAmt: 0,

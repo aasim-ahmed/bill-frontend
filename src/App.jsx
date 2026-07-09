@@ -6,21 +6,30 @@ import PrinterSettings from './pages/PrinterSettings';
 const CASHIER_KEY = 'billingpos_cashier_name';
 
 function App() {
-  const [page, setPage] = useState('billing'); // 'billing' | 'recent-bills' | 'printer-settings'
+  const [page, setPage] = useState('billing');
+  const [editingBillId, setEditingBillId] = useState(null);
 
-  // Read cashierName here so RecentBills can show the badge without prop drilling
+  const handleNavigate = (pg, billId) => {
+    setPage(pg);
+    setEditingBillId(billId || null);
+  };
+
   const cashierName = localStorage.getItem(CASHIER_KEY) || '';
 
   return (
     <div className="min-h-screen bg-slate-50">
       {page === 'billing' && (
-        <Billing onNavigate={setPage} />
+        <Billing
+          onNavigate={handleNavigate}
+          editingBillId={editingBillId}
+          onEditComplete={() => setEditingBillId(null)}
+        />
       )}
       {page === 'recent-bills' && (
-        <RecentBills onNavigate={setPage} cashierName={cashierName} />
+        <RecentBills onNavigate={handleNavigate} cashierName={cashierName} />
       )}
       {page === 'printer-settings' && (
-        <PrinterSettings onNavigate={setPage} />
+        <PrinterSettings onNavigate={handleNavigate} />
       )}
     </div>
   );

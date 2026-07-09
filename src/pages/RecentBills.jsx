@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+import { printerManager } from '../services/printing/printerManager';
+import Receipt from '../components/printing/Receipt';
 
 const API = 'https://bill-backend-w5f7.onrender.com';
 
@@ -14,6 +17,30 @@ const fmt = (iso) => {
 };
 
 const rupee = (n) => `₹${Number(n).toFixed(2)}`;
+
+const billToReceiptData = (bill) => ({
+  billNumber: `#${bill.id}`,
+  date: bill.created_at
+    ? new Date(bill.created_at).toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+      })
+    : '—',
+  cashier: bill.cashier_name || '—',
+  items: (bill.items || []).map((item) => ({
+    name: item.name,
+    qty: item.qty,
+    price: Number(item.price),
+    total: Number((Number(item.price) * Number(item.qty)).toFixed(2)),
+  })),
+  subtotal: Number(bill.subtotal),
+  discountAmt: Number(bill.discount),
+  discountPct: Number(bill.subtotal) > 0
+    ? Number(((Number(bill.discount) / Number(bill.subtotal)) * 100).toFixed(1))
+    : 0,
+  tax: 0,
+  total: Number(bill.total),
+});
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 function BillDetailModal({ billId, onClose }) {
@@ -69,14 +96,10 @@ function BillDetailModal({ billId, onClose }) {
           {bill && !loading && (
             <>
               {/* Meta row */}
-              <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
+              <div className="grid grid-cols-1 gap-3 mb-5 text-sm">
                 <div className="bg-slate-50 rounded-xl p-3">
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Cashier</span>
                   <span className="font-semibold text-slate-800">{bill.cashier_name || '—'}</span>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Customer</span>
-                  <span className="font-semibold text-slate-800">{bill.customer_name || '—'}</span>
                 </div>
               </div>
 
@@ -136,7 +159,9 @@ export default function RecentBills({ onNavigate, cashierName }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredBills = bills.filter(bill =>
-    !searchTerm || (bill.customer_name && bill.customer_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    !searchTerm ||
+    String(bill.id).includes(searchTerm) ||
+    (bill.cashier_name && bill.cashier_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const fetchBills = useCallback(() => {
@@ -149,6 +174,33 @@ export default function RecentBills({ onNavigate, cashierName }) {
   }, []);
 
   useEffect(() => { fetchBills(); }, [fetchBills]);
+
+  // ── Print state ──────────────────────────────────────────────────────────────
+  const [printingBillId, setPrintingBillId] = useState(null);
+  const [printReceiptData, setPrintReceiptData] = useState(null);
+
+  const handlePrint = async (billId, e) => {
+    if (e) e.stopPropagation();
+    if (printingBillId) return;
+    setPrintingBillId(billId);
+
+    try {
+      const { data } = await axios.get(`${API}/api/bills/${billId}`);
+      const receiptData = billToReceiptData(data.data);
+
+      if (!Capacitor.isNativePlatform()) {
+        setPrintReceiptData(receiptData);
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      }
+
+      await printerManager.printReceipt(receiptData);
+    } catch (err) {
+      console.error('Print failed:', err);
+    } finally {
+      setPrintReceiptData(null);
+      setPrintingBillId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
@@ -201,7 +253,7 @@ export default function RecentBills({ onNavigate, cashierName }) {
               <div className="relative flex-1 sm:w-64">
                 <input
                   type="text"
-                  placeholder="Search by customer name..."
+                  placeholder="Search by Bill ID or Cashier..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
@@ -270,10 +322,10 @@ export default function RecentBills({ onNavigate, cashierName }) {
                       <th className="px-5 py-3.5 text-left font-bold">#</th>
                       <th className="px-5 py-3.5 text-left font-bold">Date / Time</th>
                       <th className="px-5 py-3.5 text-left font-bold">Cashier</th>
-                      <th className="px-5 py-3.5 text-left font-bold">Customer</th>
                       <th className="px-5 py-3.5 text-left font-bold">Items</th>
                       <th className="px-5 py-3.5 text-right font-bold">Discount</th>
                       <th className="px-5 py-3.5 text-right font-bold">Total</th>
+                      <th className="px-5 py-3.5 text-center font-bold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -288,7 +340,6 @@ export default function RecentBills({ onNavigate, cashierName }) {
                         </td>
                         <td className="px-5 py-3.5 text-slate-600 whitespace-nowrap">{fmt(bill.created_at)}</td>
                         <td className="px-5 py-3.5 font-medium text-slate-800">{bill.cashier_name || '—'}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{bill.customer_name || '—'}</td>
                         <td className="px-5 py-3.5 max-w-[200px]">
                           <span className="inline-flex items-center gap-1.5">
                             <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
@@ -302,6 +353,23 @@ export default function RecentBills({ onNavigate, cashierName }) {
                         </td>
                         <td className="px-5 py-3.5 text-right font-bold text-blue-600 text-base">
                           {rupee(bill.total)}
+                        </td>
+                        <td className="px-5 py-3.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => onNavigate('billing', bill.id)}
+                              className="px-2.5 py-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={(e) => handlePrint(bill.id, e)}
+                              disabled={printingBillId === bill.id}
+                              className="px-2.5 py-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition disabled:opacity-50"
+                            >
+                              {printingBillId === bill.id ? '…' : 'Print'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -326,14 +394,10 @@ export default function RecentBills({ onNavigate, cashierName }) {
                         {rupee(bill.total)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div className="grid grid-cols-1 gap-2 text-xs mb-3">
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cashier</span>
                         <span className="font-semibold text-slate-700">{bill.cashier_name || '—'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Customer</span>
-                        <span className="font-semibold text-slate-700">{bill.customer_name || '—'}</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
@@ -349,6 +413,21 @@ export default function RecentBills({ onNavigate, cashierName }) {
                         </span>
                       )}
                     </div>
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => onNavigate('billing', bill.id)}
+                        className="flex-1 py-2 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-xl transition text-center"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={(e) => handlePrint(bill.id, e)}
+                        disabled={printingBillId === bill.id}
+                        className="flex-1 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition text-center disabled:opacity-50"
+                      >
+                        {printingBillId === bill.id ? 'Printing…' : 'Print'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -363,6 +442,22 @@ export default function RecentBills({ onNavigate, cashierName }) {
           billId={selectedId}
           onClose={() => setSelectedId(null)}
         />
+      )}
+
+      {/* ── Hidden Receipt for browser print ──────────────────────────────── */}
+      {printReceiptData && (
+        <div
+          style={{
+            position: 'fixed',
+            left: '-9999px',
+            top: 0,
+            width: '80mm',
+            zIndex: -1,
+            pointerEvents: 'none',
+          }}
+        >
+          <Receipt data={printReceiptData} />
+        </div>
       )}
     </div>
   );

@@ -10,7 +10,6 @@ const formatCurrency = (value) => `₹${Number(value || 0).toFixed(2)}`;
  *   data.billNumber   {string}
  *   data.date          {string}
  *   data.cashier       {string}
- *   data.customer      {string}
  *   data.items         {Array<{ name, qty, price, total }>}
  *   data.subtotal      {number}
  *   data.discountAmt   {number}
@@ -68,10 +67,6 @@ export default function Receipt({
           <span>Cashier:</span>
           <span>{data.cashier}</span>
         </div>
-        <div className="receipt-info-row">
-          <span>Customer:</span>
-          <span>{data.customer}</span>
-        </div>
       </div>
 
       <div className="receipt-divider receipt-divider-double" />
@@ -102,6 +97,16 @@ export default function Receipt({
 
       {/* ── Totals ──────────────────────────────────────────────── */}
       <div className="receipt-totals">
+        <div className="receipt-total-row">
+          <span>Total Products</span>
+          <span>
+            {data.items.reduce(
+              (sum, item) => sum + Number(item.qty || 0),
+              0
+            )}
+          </span>
+        </div>
+
         <div className="receipt-total-row">
           <span>Subtotal</span>
           <span>{formatCurrency(data.subtotal)}</span>

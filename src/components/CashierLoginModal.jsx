@@ -42,7 +42,7 @@ export default function CashierLoginModal({ onLogin }) {
                 d="M5.121 17.804A7 7 0 0112 15a7 7 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold tracking-tight">Welcome to BillingPOS</h2>
+          <h2 className="text-xl font-bold tracking-tight">Welcome to NazMart Billing</h2>
           <p className="text-blue-100 text-sm mt-1">Enter your name to start the session</p>
         </div>
 
