@@ -27,7 +27,6 @@ export default function Scanner({ onAddProduct }) {
 
   const inputRef = useRef(null);
   const priceInputRef = useRef(null);
-
   // Auto-focus barcode input
   useEffect(() => {
     if (!showModal && !isProcessing) {
@@ -36,15 +35,37 @@ export default function Scanner({ onAddProduct }) {
   }, [showModal, isProcessing]);
 
   const handleBlur = () => {
-    if (!showModal) {
-      setTimeout(() => {
-        const activeTag = document.activeElement?.tagName;
-        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'SELECT') {
-          inputRef.current?.focus();
-        }
-      }, 10);
-    }
+    if (showModal || isProcessing) return;
+
+    setTimeout(() => {
+      const active = document.activeElement;
+
+      // Don't steal focus if user is interacting with a button
+      if (
+        active?.tagName === 'BUTTON' ||
+        active?.closest('button')
+      ) {
+        return;
+      }
+
+      // Only refocus if nothing meaningful is focused
+      if (
+        active === document.body ||
+        active == null
+      ) {
+        inputRef.current?.focus();
+      }
+    }, 150);
   };
+  //   if (!showModal) {
+  //     setTimeout(() => {
+  //       const activeTag = document.activeElement?.tagName;
+  //       if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'SELECT') {
+  //         inputRef.current?.focus();
+  //       }
+  //     }, 10);
+  //   }
+  // };
 
   const handleKeyDown = async (e) => {
     if (e.key === 'Enter') {
@@ -135,14 +156,14 @@ export default function Scanner({ onAddProduct }) {
 
       {/* Main Scanner Area */}
       <div className="w-full flex flex-col items-center justify-center p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl relative transition-colors hover:border-slate-300">
-        
+
         <label className="text-slate-500 font-bold mb-3 text-sm uppercase tracking-wider flex items-center gap-2">
           <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
           </svg>
           USB Barcode Scanner
         </label>
-        
+
         <input
           ref={inputRef}
           type="text"
