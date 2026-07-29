@@ -206,13 +206,13 @@ export default function RecentBills({ onNavigate, cashierName }) {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-6 py-3 shadow-sm shrink-0 flex items-center gap-4">
+      <header className="bg-white border-b border-slate-200 px-6 py-3 shadow-sm shrink-0 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight shrink-0">
           Naz<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 font-black tracking-tighter ml-0.5">Mart</span>
         </h1>
 
         {/* Tab nav */}
-        <nav className="flex items-center gap-1 ml-4">
+        <nav className="flex items-center gap-1 ml-2 sm:ml-4 shrink-0">
           <button
             onClick={() => onNavigate('billing')}
             className="px-4 py-1.5 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
@@ -228,11 +228,11 @@ export default function RecentBills({ onNavigate, cashierName }) {
 
         {/* Cashier badge */}
         {cashierName && (
-          <div className="flex items-center gap-2 ml-auto bg-blue-50 border border-blue-100 rounded-full px-3.5 py-1.5">
+          <div className="flex items-center gap-2 ml-auto bg-blue-50 border border-blue-100 rounded-full px-3.5 py-1.5 min-w-0">
             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase shrink-0">
               {cashierName.charAt(0)}
             </span>
-            <span className="text-sm font-semibold text-blue-800 hidden sm:inline">
+            <span className="text-sm font-semibold text-blue-800 hidden sm:inline truncate">
               Cashier:&nbsp;<span className="font-bold">{cashierName}</span>
             </span>
           </div>
@@ -316,16 +316,16 @@ export default function RecentBills({ onNavigate, cashierName }) {
           {!loading && !error && filteredBills.length > 0 && (
             <>
               <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-fixed">
                   <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-wider">
                     <tr>
-                      <th className="px-5 py-3.5 text-left font-bold">#</th>
-                      <th className="px-5 py-3.5 text-left font-bold">Date / Time</th>
-                      <th className="px-5 py-3.5 text-left font-bold">Cashier</th>
+                      <th className="px-5 py-3.5 text-left font-bold w-[60px]">#</th>
+                      <th className="px-5 py-3.5 text-left font-bold w-[180px]">Date / Time</th>
+                      <th className="px-5 py-3.5 text-left font-bold w-[120px]">Cashier</th>
                       <th className="px-5 py-3.5 text-left font-bold">Items</th>
-                      <th className="px-5 py-3.5 text-right font-bold">Discount</th>
-                      <th className="px-5 py-3.5 text-right font-bold">Total</th>
-                      <th className="px-5 py-3.5 text-center font-bold">Actions</th>
+                      <th className="px-5 py-3.5 text-right font-bold w-[100px]">Discount</th>
+                      <th className="px-5 py-3.5 text-right font-bold w-[100px]">Total</th>
+                      <th className="px-5 py-3.5 text-center font-bold w-[120px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -339,19 +339,19 @@ export default function RecentBills({ onNavigate, cashierName }) {
                           <span className="font-mono text-xs font-bold text-slate-400">#{bill.id}</span>
                         </td>
                         <td className="px-5 py-3.5 text-slate-600 whitespace-nowrap">{fmt(bill.created_at)}</td>
-                        <td className="px-5 py-3.5 font-medium text-slate-800">{bill.cashier_name || '—'}</td>
-                        <td className="px-5 py-3.5 max-w-[200px]">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                        <td className="px-5 py-3.5 font-medium text-slate-800 truncate">{bill.cashier_name || '—'}</td>
+                        <td className="px-5 py-3.5 overflow-hidden">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold shrink-0">
                               {bill.items_count || 0}
                             </span>
                             <span className="text-slate-500 text-xs truncate">{bill.items_names || ''}</span>
-                          </span>
+                          </div>
                         </td>
-                        <td className="px-5 py-3.5 text-right text-emerald-600 font-medium">
+                        <td className="px-5 py-3.5 text-right text-emerald-600 font-medium whitespace-nowrap">
                           {Number(bill.discount) > 0 ? `− ${rupee(bill.discount)}` : '—'}
                         </td>
-                        <td className="px-5 py-3.5 text-right font-bold text-blue-600 text-base">
+                        <td className="px-5 py-3.5 text-right font-bold text-blue-600 text-base whitespace-nowrap">
                           {rupee(bill.total)}
                         </td>
                         <td className="px-5 py-3.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -386,7 +386,7 @@ export default function RecentBills({ onNavigate, cashierName }) {
                     className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:border-blue-200 hover:shadow-md transition"
                   >
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
+                      <div className="min-w-0">
                         <span className="font-mono text-[10px] font-bold text-slate-400">#{bill.id}</span>
                         <p className="text-xs text-slate-400 mt-0.5">{fmt(bill.created_at)}</p>
                       </div>
@@ -395,20 +395,20 @@ export default function RecentBills({ onNavigate, cashierName }) {
                       </span>
                     </div>
                     <div className="grid grid-cols-1 gap-2 text-xs mb-3">
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cashier</span>
-                        <span className="font-semibold text-slate-700">{bill.cashier_name || '—'}</span>
+                        <span className="font-semibold text-slate-700 block truncate">{bill.cashier_name || '—'}</span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500 truncate flex-1">
-                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold mr-1.5">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center min-w-0 flex-1">
+                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold mr-1.5 shrink-0">
                           {bill.items_count || 0}
                         </span>
-                        {bill.items_names || 'No items'}
-                      </span>
+                        <span className="text-xs text-slate-500 truncate">{bill.items_names || 'No items'}</span>
+                      </div>
                       {Number(bill.discount) > 0 && (
-                        <span className="text-xs font-medium text-emerald-600 shrink-0 ml-2">
+                        <span className="text-xs font-medium text-emerald-600 shrink-0 whitespace-nowrap">
                           − {rupee(bill.discount)}
                         </span>
                       )}
