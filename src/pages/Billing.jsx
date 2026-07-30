@@ -1,15 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
+import React, { useState, useEffect } from 'react';
 import Scanner from '../components/Scanner';
 import CashierLoginModal from '../components/CashierLoginModal';
 import Receipt from '../components/printing/Receipt';
 import InstallAppButton from '../components/InstallAppButton';
-import { printerManager } from '../services/printing/printerManager';
 import { CASHIER_KEY } from '../constants/storageKeys';
-import { buildReceiptData } from '../utils/receiptMapper';
-import { getItemKey } from '../utils/calculations';
+import useCart from '../hooks/useCart';
+import useCheckout from '../hooks/useCheckout';
 import { createProduct } from '../api/products';
-import { getBillById, createBill, updateBill } from '../api/bills';
+import { getBillById } from '../api/bills';
 
 
 
@@ -32,19 +30,41 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
   };
 
   // ── Cart / bill state ────────────────────────────────────────────────────────
-  const [cart, setCart] = useState([]);
-  const [discount, setDiscount] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [saveError, setSaveError] = useState(false);
+  const {
+    cart,
+    setCart,
+    discount,
+    setDiscount,
+
+    subtotal,
+    discountPct,
+    discountAmt,
+    total,
+
+    addProduct,
+    addManualItem,
+    removeProduct,
+    clearCart: clearCartItems,
+
+    incrementQty,
+    decrementQty,
+
+    editingItem,
+    editForm,
+    setEditForm,
+
+    startEdit,
+    cancelEdit,
+    saveEdit,
+
+    hasPriceZero,
+
+    getItemKey,
+  } = useCart();
+
   const [toast, setToast] = useState(null);  // { msg, type }
 
-  // ── Receipt / print state ─────────────────────────────────────────────────
-  const [lastSavedBill, setLastSavedBill] = useState(null); // { id, created_at, cart snapshot, totals }
-  const [receiptData, setReceiptData] = useState(null);
-
   // ── Edit state ───────────────────────────────────────────────────────────────
-  const [editingItem, setEditingItem] = useState(null); // item key
-  const [editForm, setEditForm] = useState({ name: '', price: '', updateDB: true });
   const [loadingEdit, setLoadingEdit] = useState(false);
 
   // ── Manual product state ─────────────────────────────────────────────────────
@@ -95,50 +115,13 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
   };
 
   // ── Cart helpers ─────────────────────────────────────────────────────────────
-  const handleAddProduct = useCallback((product) => {
-    setCart((prev) => {
-      // Scanner/search products are normal barcode products.
-      // Manual products will use manualId as their identity.
-      const productKey = product.isManual
-        ? product.manualId
-        : product.barcode;
-
-      const existing = prev.find((item) => {
-        const itemKey = item.isManual
-          ? item.manualId
-          : item.barcode;
-
-        return itemKey === productKey;
-      });
-
-      if (existing) {
-        showToast(`+1  ${product.name}`);
-
-        return prev.map((item) => {
-          const itemKey = item.isManual
-            ? item.manualId
-            : item.barcode;
-
-          return itemKey === productKey
-            ? {
-              ...item,
-              qty: item.qty + (Number(product.qty) || 1),
-            }
-            : item;
-        });
-      }
-
-      showToast(`Added: ${product.name}`);
-
-      return [
-        ...prev,
-        {
-          ...product,
-          qty: Number(product.qty) || 1,
-        },
-      ];
+  const handleAddProduct = (product) => {
+    addProduct(product, {
+      onIncrement: () => showToast(`+1  ${product.name}`),
+      onAdd: () => showToast(`Added: ${product.name}`),
     });
-  }, []);
+  };
+
   const handleAddManualProduct = () => {
     const name = manualProduct.name.trim();
     const price = Number(manualProduct.price);
@@ -169,7 +152,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
       isManual: true,
     };
 
-    setCart((prev) => [...prev, newManualItem]);
+    addManualItem(newManualItem);
 
     setManualProduct({
       name: '',
@@ -182,29 +165,8 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
     showToast(`Added: ${name}`);
   };
 
-  const changeQty = (itemKey, delta) => {
-    setCart((prev) =>
-      prev
-        .map((i) => {
-          const key = i.isManual ? i.manualId : i.barcode;
-
-          return key === itemKey
-            ? { ...i, qty: i.qty + delta }
-            : i;
-        })
-        .filter((i) => i.qty > 0)
-    );
-  };
-
-  const removeItem = (itemKey) =>
-    setCart((prev) =>
-      prev.filter((i) => getItemKey(i) !== itemKey)
-    );
-
   const clearCart = () => {
-    setCart([]);
-    setDiscount('');
-    setEditingItem(null);
+    clearCartItems();
 
     setManualProduct({
       name: '',
@@ -216,35 +178,19 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
   };
 
   const handleSaveEdit = async (itemKey) => {
-    const priceNum = parseFloat(editForm.price);
+    const result = saveEdit(itemKey);
 
-    if (isNaN(priceNum) || priceNum < 0) {
+    if (!result.ok && result.error === 'invalid-price') {
       showToast('Invalid price', 'error');
       return;
     }
 
-    const name = editForm.name.trim() || 'Unknown Product';
-
-    // Find the exact cart item first
-    const targetItem = cart.find(
-      (item) => getItemKey(item) === itemKey
-    );
-
-    if (!targetItem) {
+    if (!result.ok && result.error === 'item-not-found') {
       showToast('Item not found in cart', 'error');
       return;
     }
 
-    // Update exact cart item
-    setCart((prev) =>
-      prev.map((item) =>
-        getItemKey(item) === itemKey
-          ? { ...item, name, price: priceNum }
-          : item
-      )
-    );
-
-    setEditingItem(null);
+    const { targetItem, name, priceNum, updateDB } = result;
 
     // Manual products are bill-only.
     // Never sync them into Products DB.
@@ -254,7 +200,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
     }
 
     // Barcode product: preserve existing optional DB sync behavior
-    if (editForm.updateDB) {
+    if (updateDB) {
       try {
         await createProduct({
           barcode: targetItem.barcode,
@@ -272,137 +218,27 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
   };
 
   // ── Totals ───────────────────────────────────────────────────────────────────
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-
-  const discountPct = Math.min(Math.max(parseFloat(discount) || 0, 0), 100);
-  const discountAmt = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
-  const total = parseFloat((subtotal - discountAmt).toFixed(2));
-  const hasPriceZero = cart.some((i) => Number(i.price) === 0);
   const canSave = cart.length > 0 && !hasPriceZero && cashierName.trim();
 
   // ── Process & Print ─────────────────────────────────────────────────────────
-  const handleProcessAndPrint = async () => {
-    if (!canSave || processing) return;
-    setProcessing(true);
-    setSaveError(false);
-
-    // 1. Create immutable snapshot of current cart/totals state
-    const billSnapshot = {
-      cart: cart.map(item => ({ ...item })),
-      subtotal,
-      discountAmt,
-      discountPct,
-      total,
-      cashierName: cashierName.trim(),
-    };
-
-    let savedBill = null;
-
-    try {
-      if (editingBillId) {
-        // ── EDIT mode: PUT existing bill ────────────────────────────────
-        const { data } = await updateBill(editingBillId, {
-          items: billSnapshot.cart.map((item) =>
-            item.isManual
-              ? {
-                name: item.name,
-                price: Number(item.price),
-                qty: Number(item.qty),
-                isManual: true,
-              }
-              : {
-                barcode: item.barcode,
-                qty: Number(item.qty),
-              }
-          ),
-          discount: billSnapshot.discountAmt,
-          cashier_name: billSnapshot.cashierName,
-        });
-
-        const responseData = data.data;
-        savedBill = {
-          cart: responseData.items,
-          subtotal: Number(responseData.subtotal),
-          discountAmt: Number(responseData.discount),
-          discountPct: Number(responseData.subtotal) > 0
-            ? Number(((Number(responseData.discount) / Number(responseData.subtotal)) * 100).toFixed(1))
-            : 0,
-          total: Number(responseData.total),
-          cashierName: billSnapshot.cashierName,
-          id: responseData.id,
-          created_at: responseData.created_at,
-        };
-
-        onEditComplete();
-        showToast('Bill updated ✓');
-      } else {
-        // ── CREATE mode: POST new bill ──────────────────────────────────
-        const { data } = await createBill({
-          items: billSnapshot.cart.map((item) =>
-            item.isManual
-              ? {
-                name: item.name,
-                price: Number(item.price),
-                qty: Number(item.qty),
-                isManual: true,
-              }
-              : {
-                barcode: item.barcode,
-                qty: Number(item.qty),
-              }
-          ),
-          subtotal: billSnapshot.subtotal,
-          discount: billSnapshot.discountAmt,
-          total: billSnapshot.total,
-          cashier_name: billSnapshot.cashierName,
-        });
-
-        const responseData = data.data;
-        savedBill = {
-          ...billSnapshot,
-          id: responseData.id,
-          created_at: responseData.created_at,
-        };
-
-        setLastSavedBill(savedBill);
-        showToast('Bill saved ✓');
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message;
-      showToast(`Failed to save: ${msg}`, 'error');
-      setSaveError(true);
-      setProcessing(false);
-      return;
-    }
-
-    // 4. Print that exact saved bill (print never depends on cart state after save)
-    try {
-      const printData = buildReceiptData({
-        cart: savedBill.cart,
-        subtotal: savedBill.subtotal,
-        discountAmt: savedBill.discountAmt,
-        discountPct: savedBill.discountPct,
-        total: savedBill.total,
-        cashierName: savedBill.cashierName,
-        billId: savedBill.id,
-        createdAt: savedBill.created_at,
-      });
-
-      if (!Capacitor.isNativePlatform()) {
-        setReceiptData(printData);
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      }
-
-      await printerManager.printReceipt(printData);
-      showToast('Printed successfully ✓');
-    } catch (err) {
-      showToast(`Bill saved, but printing failed.`, 'error');
-    } finally {
-      setReceiptData(null);
-      clearCart(); // Clear cart only after save success is confirmed
-      setProcessing(false);
-    }
-  };
+  const {
+    processing,
+    saveError,
+    receiptData,
+    processAndPrint: handleProcessAndPrint,
+  } = useCheckout({
+    cart,
+    subtotal,
+    discountAmt,
+    discountPct,
+    total,
+    cashierName,
+    editingBillId,
+    canSave,
+    clearCart,
+    onEditComplete,
+    showToast,
+  });
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -685,7 +521,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
                           </label>
                           <div className="flex gap-2 justify-end">
                             <button
-                              onClick={() => setEditingItem(null)}
+                              onClick={cancelEdit}
                               className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-lg transition"
                             >
                               Cancel
@@ -706,10 +542,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
                           <div className="font-semibold text-slate-800 text-base truncate flex items-center gap-2">
                             {item.name}
                             <button
-                              onClick={() => {
-                                setEditingItem(getItemKey(item));
-                                setEditForm({ name: item.name, price: item.price, updateDB: true });
-                              }}
+                              onClick={() => startEdit(item)}
                               className="text-slate-300 hover:text-blue-500 transition sm:opacity-0 group-hover:opacity-100 p-1"
                               title="Edit item"
                             >
@@ -733,12 +566,12 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
                           {/* Qty */}
                           <div className="flex items-center bg-slate-50 rounded-lg p-1 border border-slate-200">
                             <button
-                              onClick={() => changeQty(getItemKey(item), -1)}
+                              onClick={() => decrementQty(getItemKey(item))}
                               className="w-8 h-8 rounded-md hover:bg-white hover:shadow-sm text-slate-600 font-bold transition flex items-center justify-center"
                             >−</button>
                             <span className="w-10 text-center font-semibold text-slate-800">{item.qty}</span>
                             <button
-                              onClick={() => changeQty(getItemKey(item), +1)}
+                              onClick={() => incrementQty(getItemKey(item))}
                               className="w-8 h-8 rounded-md hover:bg-white hover:shadow-sm text-slate-600 font-bold transition flex items-center justify-center"
                             >+</button>
                           </div>
@@ -750,7 +583,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
 
                           {/* Remove */}
                           <button
-                            onClick={() => removeItem(getItemKey(item))}
+                            onClick={() => removeProduct(getItemKey(item))}
                             className="text-slate-300 hover:text-red-500 transition sm:opacity-0 group-hover:opacity-100 p-2"
                             title="Remove item"
                           >
