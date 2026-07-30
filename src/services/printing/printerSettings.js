@@ -13,7 +13,8 @@
  * { version: 1, type: 'browser', printer: null }
  */
 
-const STORAGE_KEY = 'nazmart_printer_settings';
+import { STORAGE_KEY } from '../../constants/storageKeys';
+
 const CURRENT_VERSION = 1;
 
 function isValid(s) {

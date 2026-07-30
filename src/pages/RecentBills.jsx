@@ -1,46 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
 import { printerManager } from '../services/printing/printerManager';
 import Receipt from '../components/printing/Receipt';
-
-const API = 'https://bill-backend-w5f7.onrender.com';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const fmt = (iso) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true,
-  });
-};
-
-const rupee = (n) => `₹${Number(n).toFixed(2)}`;
-
-const billToReceiptData = (bill) => ({
-  billNumber: `#${bill.id}`,
-  date: bill.created_at
-    ? new Date(bill.created_at).toLocaleString('en-IN', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: true,
-      })
-    : '—',
-  cashier: bill.cashier_name || '—',
-  items: (bill.items || []).map((item) => ({
-    name: item.name,
-    qty: item.qty,
-    price: Number(item.price),
-    total: Number((Number(item.price) * Number(item.qty)).toFixed(2)),
-  })),
-  subtotal: Number(bill.subtotal),
-  discountAmt: Number(bill.discount),
-  discountPct: Number(bill.subtotal) > 0
-    ? Number(((Number(bill.discount) / Number(bill.subtotal)) * 100).toFixed(1))
-    : 0,
-  tax: 0,
-  total: Number(bill.total),
-});
+import { getRecentBills, getBillById } from '../api/bills';
+import { fmt } from '../utils/date';
+import { rupee } from '../utils/currency';
+import { billToReceiptData } from '../utils/receiptMapper';
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 function BillDetailModal({ billId, onClose }) {
@@ -49,7 +14,7 @@ function BillDetailModal({ billId, onClose }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    axios.get(`${API}/api/bills/${billId}`)
+    getBillById(billId)
       .then(({ data }) => setBill(data.data))
       .catch(() => setError('Failed to load bill details.'))
       .finally(() => setLoading(false));
@@ -167,7 +132,7 @@ export default function RecentBills({ onNavigate, cashierName }) {
   const fetchBills = useCallback(() => {
     setLoading(true);
     setError('');
-    axios.get(`${API}/api/bills?limit=50`)
+    getRecentBills()
       .then(({ data }) => setBills(data.data || []))
       .catch(() => setError('Failed to load recent bills. Check your connection.'))
       .finally(() => setLoading(false));
@@ -185,7 +150,7 @@ export default function RecentBills({ onNavigate, cashierName }) {
     setPrintingBillId(billId);
 
     try {
-      const { data } = await axios.get(`${API}/api/bills/${billId}`);
+      const { data } = await getBillById(billId);
       const receiptData = billToReceiptData(data.data);
 
       if (!Capacitor.isNativePlatform()) {

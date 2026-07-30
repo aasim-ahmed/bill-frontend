@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-
-const API = 'https://bill-backend-w5f7.onrender.com';
+import { getProductByBarcode, createProduct } from '../api/products';
 
 const SOURCE_LABEL = {
   open_food_facts: 'Open Food Facts',
@@ -75,7 +73,7 @@ export default function Scanner({ onAddProduct }) {
 
       setIsProcessing(true);
       try {
-        const { data } = await axios.get(`${API}/api/products/${barcode}`);
+        const { data } = await getProductByBarcode(barcode);
         onAddProduct?.(data.data);
         setInputValue('');
       } catch (err) {
@@ -121,7 +119,7 @@ export default function Scanner({ onAddProduct }) {
     setSaving(true);
     setModalError('');
     try {
-      const { data } = await axios.post(`${API}/api/products`, {
+      const { data } = await createProduct({
         name: productName.trim(),
         price: priceNum,
         barcode: unknownBarcode,
@@ -132,7 +130,7 @@ export default function Scanner({ onAddProduct }) {
     } catch (err) {
       if (err.response?.status === 409) {
         try {
-          const { data } = await axios.get(`${API}/api/products/${unknownBarcode}`);
+          const { data } = await getProductByBarcode(unknownBarcode);
           onAddProduct?.(data.data);
           setInputValue('');
           closeModal();

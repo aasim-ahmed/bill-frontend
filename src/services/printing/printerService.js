@@ -21,7 +21,7 @@ const UsbEscPosPrinter = registerPlugin('UsbEscPosPrinter');
 
 // ── Printer cache ─────────────────────────────────────────────────────────────
 
-const PRINTER_CACHE_KEY = 'nazmart_cached_printer';
+import { PRINTER_CACHE_KEY } from '../../constants/storageKeys';
 
 function loadCachedPrinter() {
   try {

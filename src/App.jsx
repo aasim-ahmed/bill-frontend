@@ -2,8 +2,7 @@ import { useState } from 'react';
 import Billing from './pages/Billing';
 import RecentBills from './pages/RecentBills';
 import PrinterSettings from './pages/PrinterSettings';
-
-const CASHIER_KEY = 'billingpos_cashier_name';
+import { CASHIER_KEY } from './constants/storageKeys';
 
 function App() {
   const [page, setPage] = useState('billing');

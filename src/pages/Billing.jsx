@@ -1,50 +1,15 @@
-import React, { useState, useCallback } from 'react';
-import axios from 'axios';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import Scanner from '../components/Scanner';
 import CashierLoginModal from '../components/CashierLoginModal';
 import Receipt from '../components/printing/Receipt';
 import InstallAppButton from '../components/InstallAppButton';
 import { printerManager } from '../services/printing/printerManager';
-import { useEffect } from 'react';
-
-const API = 'https://bill-backend-w5f7.onrender.com';
-const CASHIER_KEY = 'billingpos_cashier_name';
-
-const buildReceiptData = ({
-  cart,
-  subtotal,
-  discountAmt,
-  discountPct,
-  total,
-  cashierName,
-  billId,
-  createdAt,
-}) => ({
-  billNumber: billId ? `#${billId}` : '—',
-  date: createdAt
-    ? new Date(createdAt).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    })
-    : new Date().toLocaleString('en-IN'),
-  cashier: cashierName || '—',
-  items: cart.map((item) => ({
-    name: item.name,
-    qty: item.qty,
-    price: Number(item.price),
-    total: Number((Number(item.price) * Number(item.qty)).toFixed(2)),
-  })),
-  subtotal: Number(subtotal),
-  discountAmt: Number(discountAmt),
-  discountPct: Number(discountPct),
-  tax: 0,
-  total: Number(total),
-});
+import { CASHIER_KEY } from '../constants/storageKeys';
+import { buildReceiptData } from '../utils/receiptMapper';
+import { getItemKey } from '../utils/calculations';
+import { createProduct } from '../api/products';
+import { getBillById, createBill, updateBill } from '../api/bills';
 
 
 
@@ -95,7 +60,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
   useEffect(() => {
     if (!editingBillId) return;
     setLoadingEdit(true);
-    axios.get(`${API}/api/bills/${editingBillId}`)
+    getBillById(editingBillId)
       .then(({ data }) => {
         const bill = data.data;
         setCart(
@@ -291,7 +256,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
     // Barcode product: preserve existing optional DB sync behavior
     if (editForm.updateDB) {
       try {
-        await axios.post(`${API}/api/products`, {
+        await createProduct({
           barcode: targetItem.barcode,
           name,
           price: priceNum,
@@ -308,12 +273,6 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
 
   // ── Totals ───────────────────────────────────────────────────────────────────
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-
-  // Safe identity for both barcode and manual products
-  const getItemKey = (item) =>
-    item.isManual
-      ? item.manualId
-      : item.barcode;
 
   const discountPct = Math.min(Math.max(parseFloat(discount) || 0, 0), 100);
   const discountAmt = parseFloat(((subtotal * discountPct) / 100).toFixed(2));
@@ -342,7 +301,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
     try {
       if (editingBillId) {
         // ── EDIT mode: PUT existing bill ────────────────────────────────
-        const { data } = await axios.put(`${API}/api/bills/${editingBillId}`, {
+        const { data } = await updateBill(editingBillId, {
           items: billSnapshot.cart.map((item) =>
             item.isManual
               ? {
@@ -378,7 +337,7 @@ export default function Billing({ onNavigate, editingBillId, onEditComplete }) {
         showToast('Bill updated ✓');
       } else {
         // ── CREATE mode: POST new bill ──────────────────────────────────
-        const { data } = await axios.post(`${API}/api/bills`, {
+        const { data } = await createBill({
           items: billSnapshot.cart.map((item) =>
             item.isManual
               ? {
