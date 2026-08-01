@@ -292,3 +292,53 @@ PostgreSQL (Neon)
 The frontend communicates with the backend through a centralized API layer. Business logic remains on the server while the frontend focuses on delivering a fast, responsive, and intuitive user experience.
 
 ---
+---
+
+# 🚀 Roadmap
+
+The following enhancements are planned for future releases.
+
+- [x] Barcode Scanning
+- [x] Smart Billing
+- [x] Product Management
+- [x] Bill Editing
+- [x] Recent Bills
+- [x] Browser Printing
+- [x] Bluetooth Thermal Printing
+- [x] Progressive Web App (PWA)
+
+### Planned Features
+
+- [ ] User Authentication
+- [ ] Role-Based Access Control
+- [ ] Sales Analytics Dashboard
+- [ ] Inventory Reports
+- [ ] Customer Management
+- [ ] Offline Data Synchronization
+- [ ] Multi-Store Support
+- [ ] GST Reports
+- [ ] Dark Mode
+
+---
+---
+
+# 🤝 Contributing
+
+Contributions, suggestions, and bug reports are welcome.
+
+If you would like to improve NazMart:
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Open a Pull Request.
+
+Please ensure all changes follow the existing project structure and coding style.
+
+---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+See the `LICENSE` file for more information.
