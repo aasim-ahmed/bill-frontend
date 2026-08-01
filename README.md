@@ -98,3 +98,26 @@ NazMart follows a modular and scalable React architecture that separates UI comp
 - **Shared Utilities** provide common helpers, calculations, formatting, and constants.
 - **Backend** exposes REST APIs built with Express.js.
 - **Database** persists products and billing data using PostgreSQL.
+
+---
+
+# 🛠️ Tech Stack
+
+NazMart Frontend is built using a modern React ecosystem designed for performance, scalability, and maintainability.
+
+| Category | Technologies |
+|----------|--------------|
+| **Frontend** | React 19, Vite 7, JavaScript (ES6+) |
+| **Styling** | Tailwind CSS |
+| **HTTP Client** | Axios |
+| **Barcode Scanning** | ZXing (`@zxing/browser`, `@zxing/library`) |
+| **Mobile Support** | Capacitor |
+| **Printing** | Browser Printing, Bluetooth Thermal Printing (ESC/POS) |
+| **Progressive Web App** | Vite PWA Plugin |
+| **State Management** | React Hooks |
+| **Backend API** | Node.js + Express.js REST API |
+| **Database** | PostgreSQL (Neon) |
+| **Deployment** | Render |
+| **Version Control** | Git & GitHub |
+
+---
