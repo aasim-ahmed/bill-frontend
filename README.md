@@ -245,3 +245,50 @@ npm run preview
 ```
 
 ---
+
+---
+
+# 🌐 Deployment
+
+NazMart Frontend is deployed as a production-ready web application and communicates with the NazMart Backend through a REST API.
+
+## Live Demo
+
+🌍 **https://www.nazmart.store**
+
+---
+
+## Production Stack
+
+| Layer | Technology |
+|--------|------------|
+| Frontend | React + Vite |
+| Backend | Express.js |
+| Database | PostgreSQL (Neon) |
+| Deployment | Render |
+| Mobile | Capacitor |
+| Printing | Browser + Bluetooth Thermal Printer |
+
+---
+
+## Production Architecture
+
+```
+User
+   │
+   ▼
+NazMart Frontend (React)
+   │
+   ▼
+REST API
+   │
+   ▼
+NazMart Backend (Express.js)
+   │
+   ▼
+PostgreSQL (Neon)
+```
+
+The frontend communicates with the backend through a centralized API layer. Business logic remains on the server while the frontend focuses on delivering a fast, responsive, and intuitive user experience.
+
+---
