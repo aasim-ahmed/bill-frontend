@@ -165,3 +165,83 @@ billing-frontend/
 | **assets/** | Images, icons, and static resources used by the application |
 
 ---
+
+---
+
+# 🚀 Getting Started
+
+Follow the steps below to run NazMart Frontend locally.
+
+## 📋 Prerequisites
+
+Make sure you have the following installed:
+
+- Node.js **20+**
+- npm **10+**
+- Git
+- NazMart Backend API running locally or deployed
+
+---
+
+## 📥 Clone the Repository
+
+```bash
+git clone https://github.com/aasim-ahmed/nazmart-frontend.git
+cd nazmart-frontend
+```
+
+---
+
+## 📦 Install Dependencies
+
+```bash
+npm install
+```
+
+---
+
+## ⚙️ Configure Environment Variables
+
+Create a `.env` file in the project root.
+
+Example:
+
+```env
+VITE_API_BASE_URL=http://localhost:10000/api
+```
+
+For production:
+
+```env
+VITE_API_BASE_URL=https://bill-backend-w5f7.onrender.com/api
+```
+
+---
+
+## ▶️ Start Development Server
+
+```bash
+npm run dev
+```
+
+Application will be available at:
+
+```
+http://localhost:5173
+```
+
+---
+
+## 🏗️ Production Build
+
+```bash
+npm run build
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+---
