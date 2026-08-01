@@ -121,3 +121,47 @@ NazMart Frontend is built using a modern React ecosystem designed for performanc
 | **Version Control** | Git & GitHub |
 
 ---
+
+---
+
+# 📁 Project Structure
+
+The frontend follows a modular architecture to keep the codebase scalable, maintainable, and easy to extend.
+
+```text
+billing-frontend/
+│
+├── assets/                 # README assets & screenshots
+├── public/                 # Static files
+├── src/
+│   ├── api/                # Centralized API communication
+│   ├── assets/             # Application assets
+│   ├── components/         # Reusable UI components
+│   ├── constants/          # Shared configuration & constants
+│   ├── hooks/              # Custom React hooks
+│   ├── pages/              # Application pages
+│   │   └── Billing/        # Billing page modules
+│   ├── services/           # Printing & external integrations
+│   ├── utils/              # Shared helper functions
+│   ├── App.jsx
+│   └── main.jsx
+│
+├── package.json
+├── vite.config.js
+└── README.md
+```
+
+## 📂 Folder Responsibilities
+
+| Folder | Purpose |
+|---------|---------|
+| **api/** | Centralized communication with the backend REST API |
+| **components/** | Reusable UI components shared across pages |
+| **constants/** | Global configuration values and application constants |
+| **hooks/** | Custom React hooks containing reusable business logic |
+| **pages/** | Top-level application screens |
+| **services/** | Printing services, Bluetooth integration, and external functionality |
+| **utils/** | Shared helper functions, calculations, and formatting utilities |
+| **assets/** | Images, icons, and static resources used by the application |
+
+---
